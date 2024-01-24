@@ -11,6 +11,7 @@ export async function Information(req, res) {
       phonenumber,
       gender,
       profile,
+      bio:'',
     });
     return res.status(200).send({ msg: `Successfully Updated Information` });
   } catch (error) {

@@ -4,6 +4,7 @@ import * as controller from '../controlers/appControlers.js'
 router.route('/information').post(controller.Information)
 router.route('/connections').post(controller.Connections)
 router.route('/editInformation').post(controller.editProfile)
+router.route('/post').post(controller.Post)
 
 router.route('/allusers/:id').get(controller.getAllUsers)
 router.route('/user/:username').get(controller.getUser)

@@ -87,3 +87,20 @@ export async function editProfile(req, res) {
     return res.status(404).send({ error: `Cann't Edit Information` });
   }
 }
+export async function Post(req, res) {
+  const {image,text,createdBy} = req.body;
+  const docRef = firebase.firestore().collection("posts");
+  try {
+    await docRef.add({
+      image,
+      text,
+      createdBy,
+      createdAt: new Date(),
+    });
+    return res.status(200).send({ msg: `Successfully posted` });
+  } catch (error) {
+    console.log(error);
+    return res.status(404).send({ error: `Cann't post` });
+  }
+}
+

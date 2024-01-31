@@ -1,17 +1,16 @@
 import firebase, { auth, db } from "../setup/firebase.js";
 import "firebase/compat/firestore";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 export async function Information(req, res) {
-  const { email, username, birthdate, phonenumber, gender, profile, uid } =req.body;
+  const { email, username, profile, uid } =
+    req.body;
   const docRef = firebase.firestore().collection("users").doc(uid);
   try {
     await docRef.set({
       email,
       username,
-      birthdate,
-      phonenumber,
-      gender,
       profile,
-      bio: "",
+      bio:null,
     });
     return res.status(200).send({ msg: `Successfully Updated Information` });
   } catch (error) {
@@ -73,8 +72,8 @@ export async function getUser(req, res) {
 export async function editProfile(req, res) {
   const { username, profile, uid, bio } = req.body;
   const docRef = firebase.firestore().collection("users").doc(uid);
-//   const snapshot = await docRef.get();
-//   let userData = snapshot.data();
+  //   const snapshot = await docRef.get();
+  //   let userData = snapshot.data();
   try {
     await docRef.update({
       username,
@@ -87,8 +86,8 @@ export async function editProfile(req, res) {
     return res.status(404).send({ error: `Cann't Edit Information` });
   }
 }
-export async function Post(req, res) {
-  const {image,text,createdBy} = req.body;
+export async function createPost(req, res) {
+  const { image, text, createdBy } = req.body;
   const docRef = firebase.firestore().collection("posts");
   try {
     await docRef.add({
@@ -96,6 +95,8 @@ export async function Post(req, res) {
       text,
       createdBy,
       createdAt: new Date(),
+      likes:[],
+      comments:[]
     });
     return res.status(200).send({ msg: `Successfully posted` });
   } catch (error) {
@@ -103,4 +104,86 @@ export async function Post(req, res) {
     return res.status(404).send({ error: `Cann't post` });
   }
 }
+// export async function getPosts(req,res){
+//   try {
+//     // const postsCollection = firebase.firestore().collection('posts')
+//     const connectionCollectionRef=collection(db,'connections')
+//     const postsCollection = collection(db, 'posts');
+//     const qConnection=query(connectionCollectionRef,where('follower_id','==',req.params.id))
+//     const querySnapshotConnection=await getDocs(qConnection);
+//     const followee=[];
+//     const posts=[];
+//     querySnapshotConnection.forEach((doc)=>{
+//       const data=doc.data().followee_id;
+//       followee.push(data);
+//     })
+//     followee.forEach(async (followeeDoc) => {
+//       const followeePostsQuery = query(postsCollection,
+//         where('createdBy', '==', followeeDoc),
+//         orderBy('createdAt', 'desc')
+//       );
+//       const followeePostsSnapshot = await getDocs(followeePostsQuery);
+//       followeePostsSnapshot.forEach((postDoc) => {
+//         const postData = postDoc.data();
+//         posts.push(postData);
+//       });
+//       })
+//     // const postsCollection = collection(db, 'posts');
+//     // const q = query(postsCollection, orderBy('createdAt', 'desc'));
+//     // const querySnapshot = await getDocs(q);
+//     // const posts = [];
+//     // querySnapshot.forEach((doc) => {
+//     //   const data = doc.data();
+//     //   posts.push(data);
+//     // });
+//     console.log('Posts:', posts);
+//     return res.status(200).send({ msg: `Successfully posted` ,posts,followee});
+//   } catch (error) {
+//     console.error('Error fetching posts:', error);
+//     throw error;
+//   }
+// }
+export async function getPosts(req, res) {
+  try {
+    const connectionCollectionRef = collection(db, "connections");
+    const userCollectionDocRef = collection(db, "users");
+    const docRef = firebase.firestore().collection("users");
+    const postsCollection = collection(db, "posts");
+    const qConnection = query(connectionCollectionRef,where("follower_id", "==", req.params.id));
+    const querySnapshotConnection = await getDocs(qConnection);
+    const followee = [];
+    const posts = [];
 
+    querySnapshotConnection.forEach(async (doc) => {
+      const dataUserId = doc.data().followee_id;
+      const snapshot = await docRef.doc(dataUserId).get();
+      const { username, profile } = snapshot.data();
+      followee.push({ username, profile, uid: dataUserId });
+    });
+    const snapshot = await docRef.doc(req.params.id).get();
+    const { username, profile } = snapshot.data();
+    followee.push({ username, profile, uid: req.params.id });
+    const followeePostsPromises = followee.map(async (followeeDoc) => {
+      const followeePostsQuery = query(postsCollection,
+        where('createdBy', '==', followeeDoc.uid),
+        orderBy('createdAt', 'desc')
+      );
+      const followeePostsSnapshot = await getDocs(followeePostsQuery);
+      const followeePosts = [];
+      followeePostsSnapshot.forEach((postDoc) => {
+        const {image,text,createdAt,createdBy} = postDoc.data();
+        followeePosts.push({image,text,createdAt,createdBy,username:followeeDoc.username,profile:followeeDoc.profile,postId:postDoc.id});
+      });
+      return followeePosts;
+    });
+    const followeePostsArrays = await Promise.all(followeePostsPromises);
+    followeePostsArrays.forEach((followeePostsArray) => {
+      posts.push(...followeePostsArray);
+    });
+    posts.sort((a, b) => b.createdAt - a.createdAt);
+    return res.status(200).send({ msg: "Successfully posted", posts });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    throw error;
+  }
+}

@@ -96,7 +96,8 @@ export async function createPost(req, res) {
       createdBy,
       createdAt: new Date(),
       likes:[],
-      comments:[]
+      comments:[],
+      bookmarks:[]
     });
     return res.status(200).send({ msg: `Successfully posted` });
   } catch (error) {
@@ -104,45 +105,6 @@ export async function createPost(req, res) {
     return res.status(404).send({ error: `Cann't post` });
   }
 }
-// export async function getPosts(req,res){
-//   try {
-//     // const postsCollection = firebase.firestore().collection('posts')
-//     const connectionCollectionRef=collection(db,'connections')
-//     const postsCollection = collection(db, 'posts');
-//     const qConnection=query(connectionCollectionRef,where('follower_id','==',req.params.id))
-//     const querySnapshotConnection=await getDocs(qConnection);
-//     const followee=[];
-//     const posts=[];
-//     querySnapshotConnection.forEach((doc)=>{
-//       const data=doc.data().followee_id;
-//       followee.push(data);
-//     })
-//     followee.forEach(async (followeeDoc) => {
-//       const followeePostsQuery = query(postsCollection,
-//         where('createdBy', '==', followeeDoc),
-//         orderBy('createdAt', 'desc')
-//       );
-//       const followeePostsSnapshot = await getDocs(followeePostsQuery);
-//       followeePostsSnapshot.forEach((postDoc) => {
-//         const postData = postDoc.data();
-//         posts.push(postData);
-//       });
-//       })
-//     // const postsCollection = collection(db, 'posts');
-//     // const q = query(postsCollection, orderBy('createdAt', 'desc'));
-//     // const querySnapshot = await getDocs(q);
-//     // const posts = [];
-//     // querySnapshot.forEach((doc) => {
-//     //   const data = doc.data();
-//     //   posts.push(data);
-//     // });
-//     console.log('Posts:', posts);
-//     return res.status(200).send({ msg: `Successfully posted` ,posts,followee});
-//   } catch (error) {
-//     console.error('Error fetching posts:', error);
-//     throw error;
-//   }
-// }
 export async function getPosts(req, res) {
   try {
     const connectionCollectionRef = collection(db, "connections");
@@ -153,7 +115,6 @@ export async function getPosts(req, res) {
     const querySnapshotConnection = await getDocs(qConnection);
     const followee = [];
     const posts = [];
-
     querySnapshotConnection.forEach(async (doc) => {
       const dataUserId = doc.data().followee_id;
       const snapshot = await docRef.doc(dataUserId).get();
@@ -161,6 +122,7 @@ export async function getPosts(req, res) {
       followee.push({ username, profile, uid: dataUserId });
     });
     const snapshot = await docRef.doc(req.params.id).get();
+    if(!snapshot.exists)return;
     const { username, profile } = snapshot.data();
     followee.push({ username, profile, uid: req.params.id });
     const followeePostsPromises = followee.map(async (followeeDoc) => {
@@ -185,5 +147,28 @@ export async function getPosts(req, res) {
   } catch (error) {
     console.error("Error fetching posts:", error);
     throw error;
+  }
+}
+function getAllPostUserData(postSnapshotCollection){
+  const tempPost=[];
+  postSnapshotCollection.forEach(async (doc) => {
+    const {createdBy,createdAt,image,text,likes,bookmarks,comments}=doc.data();
+    tempPost.push({createdBy,createdAt,image,text,likes,bookmarks,comments});
+  });
+  return tempPost;
+  
+}
+export async function getCurrentUserPost(req,res){
+  try{
+  const currentUserUid=req.params.id;
+  const postsCollection = collection(db, "posts");
+  const postQueryCollection = query(postsCollection,where("createdBy", "==",currentUserUid ));
+  const postSnapshotCollection = await getDocs(postQueryCollection);
+  const tmpPost=getAllPostUserData(postSnapshotCollection);
+  
+  return res.status(200).send({ msg: "get Successfully", tmpPost });
+  }catch (error) {
+    console.log(error);
+    return res.status(404).send({ error: `Cann't post` });
   }
 }

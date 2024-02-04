@@ -8,6 +8,7 @@ router.route('/post').post(controller.createPost)
 router.route('/getpost/:id').get(controller.getPosts)
 router.route('/allusers/:id').get(controller.getAllUsers)
 router.route('/user/:username').get(controller.getUser)
+router.route('/getCurrentuserPost/:id').get(controller.getCurrentUserPost)
 
 
 export default router;

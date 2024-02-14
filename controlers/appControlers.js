@@ -108,7 +108,6 @@ export async function createPost(req, res) {
 export async function getPosts(req, res) {
   try {
     const connectionCollectionRef = collection(db, "connections");
-    const userCollectionDocRef = collection(db, "users");
     const docRef = firebase.firestore().collection("users");
     const postsCollection = collection(db, "posts");
     const qConnection = query(connectionCollectionRef,where("follower_id", "==", req.params.id));
@@ -118,11 +117,13 @@ export async function getPosts(req, res) {
     querySnapshotConnection.forEach(async (doc) => {
       const dataUserId = doc.data().followee_id;
       const snapshot = await docRef.doc(dataUserId).get();
+      if(snapshot.exists){
       const { username, profile } = snapshot.data();
       followee.push({ username, profile, uid: dataUserId });
+      }
     });
     const snapshot = await docRef.doc(req.params.id).get();
-    if(!snapshot.exists)return;
+    if(snapshot.exists){
     const { username, profile } = snapshot.data();
     followee.push({ username, profile, uid: req.params.id });
     const followeePostsPromises = followee.map(async (followeeDoc) => {
@@ -143,32 +144,72 @@ export async function getPosts(req, res) {
       posts.push(...followeePostsArray);
     });
     posts.sort((a, b) => b.createdAt - a.createdAt);
+  }
     return res.status(200).send({ msg: "Successfully posted", posts });
   } catch (error) {
     console.error("Error fetching posts:", error);
+    return res.status(404).send({ error: `Can't get posts` });
     throw error;
   }
 }
-function getAllPostUserData(postSnapshotCollection){
-  const tempPost=[];
-  postSnapshotCollection.forEach(async (doc) => {
-    const {createdBy,createdAt,image,text,likes,bookmarks,comments}=doc.data();
-    tempPost.push({createdBy,createdAt,image,text,likes,bookmarks,comments});
-  });
+async function getAllPostUserData(postSnapshotCollection) {
+  const tempPost = [];
+  const docRef = firebase.firestore().collection("users");
+
+  try {
+    for (const doc of postSnapshotCollection.docs) {
+      const { createdBy, createdAt, image, text, likes, bookmarks, comments } = doc.data();
+      const snapshot = await docRef.doc(createdBy).get();
+      const { username, profile } = snapshot.data();
+      tempPost.push({ createdBy, createdAt, image, text, likes, bookmarks, comments, username, profile,postId:doc.id });
+    }
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+  }
+
   return tempPost;
-  
 }
-export async function getCurrentUserPost(req,res){
-  try{
-  const currentUserUid=req.params.id;
-  const postsCollection = collection(db, "posts");
-  const postQueryCollection = query(postsCollection,where("createdBy", "==",currentUserUid ));
-  const postSnapshotCollection = await getDocs(postQueryCollection);
-  const tmpPost=getAllPostUserData(postSnapshotCollection);
-  
-  return res.status(200).send({ msg: "get Successfully", tmpPost });
-  }catch (error) {
+export async function getCurrentUserPost(req, res) {
+  try {
+    const currentUserUid = req.params.id;
+    const postsCollection = collection(db, "posts");
+    const postQueryCollection = query(postsCollection, where("createdBy", "==", currentUserUid));
+    const postSnapshotCollection = await getDocs(postQueryCollection);
+    const posts = await getAllPostUserData(postSnapshotCollection);
+    posts.sort((a, b) => b.createdAt - a.createdAt);
+    return res.status(200).send({ msg: "get Successfully", posts });
+  } catch (error) {
     console.log(error);
-    return res.status(404).send({ error: `Cann't post` });
+    return res.status(404).send({ error: `Can't get posts` });
+  }
+}
+export async function getCurrentUserBookmark(req, res) {
+  const postsData=[];
+  try {
+    const currentUserUid = req.params.id;
+    const docRef = firebase.firestore().collection("bookmarks");
+    const docRefPost = firebase.firestore().collection("posts");
+    const docRefUser = firebase.firestore().collection("users");
+
+    const postBookmark=await docRef.doc(currentUserUid).get();
+    try{
+      const posts=postBookmark.data().posts;
+      const postPromiss=posts.map(async(postId)=>{
+      const postSnapshot=await docRefPost.doc(postId).get();
+      const { createdBy, createdAt, image, text, likes, bookmarks, comments } = postSnapshot.data();
+      const snapshot = await docRefUser.doc(createdBy).get();
+      const { username, profile } = snapshot.data();
+      postsData.push({ createdBy, createdAt, image, text, likes, bookmarks, comments, username, profile,postId });
+      })
+      await Promise.all(postPromiss)
+      postsData.sort((a, b) => b.createdAt - a.createdAt);
+    }
+    catch(error){
+      console.log(error.message);
+    }
+    return res.status(200).send({ msg: "get Successfully", posts:postsData });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(404).send({ error: `Can't Bookmark` });
   }
 }

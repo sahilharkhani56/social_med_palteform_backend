@@ -9,6 +9,7 @@ router.route('/getpost/:id').get(controller.getPosts)
 router.route('/allusers/:id').get(controller.getAllUsers)
 router.route('/user/:username').get(controller.getUser)
 router.route('/getCurrentuserPost/:id').get(controller.getCurrentUserPost)
+router.route('/getCurrentuserBookmark/:id').get(controller.getCurrentUserBookmark)
 
 
 export default router;
